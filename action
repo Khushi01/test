@@ -1,0 +1,134 @@
+import Tags from '../../../../lib/model/Tags';
+import { showMessage } from 'app/store/actions/fuse';
+export const MANAGE_TAG_POPOVER = 'MANAGE_TAG_POPOVER';
+export const CREATE_NEW_TAG = 'ADD_NEW_TAG';
+export const UPDATE_TAG = 'UPDATE_TAG';
+export const DELETE_TAG = 'DELETE_TAG';
+export const SET_TAG_SEARCH_TEXT = 'SET_TAG_SEARCH_TEXT';
+export const GET_TAG_LIST='GET_TAG_LIST';
+
+export const manageTagPopover = () => {
+	return dispatch => {
+		dispatch({
+			type: MANAGE_TAG_POPOVER
+		});
+	};
+};
+export const getTagList = () => {
+	return async (dispatch,getState) => {
+		try {
+			let currentState = getState();
+			const currentBusiness = currentState.auth.user.data.currentBusiness
+			//business_id, moduleType, sortBy, sortDirection
+			const response = await Tags.getAllTags(currentBusiness.id);
+			if (response) {
+				dispatch({
+					type: GET_TAG_LIST,
+					payload: response
+				});
+			} else {
+				dispatch({
+					type: GET_TAG_LIST,
+					payload: []
+				});
+				dispatch(showMessage({ message: 'Unable to fetch Tag', variant: 'error' }));
+			}
+		} catch (error) {
+			return error;
+		}
+	};
+};
+
+export const createNewTag = data => {
+	// return dispatch => {
+	// 	dispatch({
+	// 		type: ADD_NEW_TAG,
+	// 		payload: data
+	// 	});
+	// 	dispatch(showMessage({ message: 'New Tag Added Successfully.', variant: 'success' }));
+	// };
+
+	return async (dispatch, getState) => {
+		try {
+			const currentState = getState();
+			const userDetail = JSON.parse(localStorage.getItem('userDetail'));
+			const currentBusiness = currentState.auth.user.data.currentBusiness;
+			const { first_name, last_name, id } = userDetail.userData;
+			const { tagName,moduleType } = data;
+			const newTag = await new Tags(null);
+			newTag.name = tagName;
+			newTag.module_type=moduleType;
+			newTag.business_id = currentBusiness.id;
+			newTag.type = 'emailTemplate';
+			newTag.created_by = {
+				name: `${first_name || ''} ${last_name || ''}`,
+				id: id
+			};
+			await newTag.save();
+			dispatch({
+				type: CREATE_NEW_TAG,
+				payload: { id: newTag._id, ...newTag.data }
+			});
+			dispatch(showMessage({ message: 'New Tag Added Successfully.', variant: 'success' }));
+		} catch (error) {
+			return error;
+		}
+	};
+};
+
+export const updateTag = tagData => {
+	return dispatch => {
+		dispatch({
+			type: UPDATE_TAG,
+			payload: {
+				data: tagData
+			}
+		});
+		dispatch(showMessage({ message: 'Tag Updated Successfully.', variant: 'success' }));
+	};
+};
+
+export const deleteTag = id => {
+	// return dispatch => {
+	// 	dispatch({
+	// 		type: DELETE_TAG,
+	// 		payload: id
+	// 	});
+	// 	dispatch(showMessage({ message: 'Tag Deleted Successfully.', variant: 'success' }));
+	// };
+	return async (dispatch, getState) => {
+		try {
+			const userDetail = JSON.parse(localStorage.getItem('userDetail'));
+			const currentState = getState();
+			let tagList = currentState.setting.tags.tagList;
+			const data = {
+				modified_by: {
+					name: `${userDetail.userData.first_name || ''} ${userDetail.userData.last_name || ''}`,
+					id: userDetail.userData.id
+				}
+			};
+			let response = await Tags.deleteTagById(id, data);
+			if (response.status === 1) {
+				const data = tagList.filter(item => item.id !== id);
+				dispatch({
+					type: DELETE_TAG,
+					payload: data
+				});
+				dispatch(showMessage({ message: 'Tag deleted successfully.', variant: 'success' }));
+			} else {
+				dispatch(showMessage({ message: response.message, variant: 'error' }));
+			}
+			return true;
+		} catch (error) {
+			return error;
+		}
+	};
+};
+
+export function setTagSearchText(event) {
+	return {
+		type: SET_TAG_SEARCH_TEXT,
+		searchText: event.target.value
+	};
+}
+
